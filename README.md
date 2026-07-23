@@ -1,57 +1,59 @@
 # qwen-image-shardedit-mlx
 
-**Last Updated:** 2026-07-23
-
 [中文说明](README-CN.md)
 
-qwen-image-shardedit-mlx is an unofficial Apple Silicon / MLX runtime experiment for
-Qwen Image Edit. It keeps the mflux-compatible path, adds shard residency for
-24 GB Macs, and exposes residual-cache experiments as opt-in presets.
+Unofficial Apple Silicon / MLX runtime for [Qwen Image Edit](https://github.com/QwenLM/Qwen-Image), built as a thin mflux-compatible layer. It adds **shard residency** so 24 GB Macs can run the full 8-step × 60-block edit path without the stock `--low-ram` wall-clock cliff, and exposes residual-cache presets as **opt-in** speed experiments.
 
-This repository does not include model weights, LoRA files, reference photos,
-or generated benchmark images. Put your private test image at `ref.png`; the
-default benchmark size is `576x768`.
+> This repository ships code and docs only — no model weights, LoRAs, reference photos, or generated images.
 
-## Current Status
+## Highlights
 
-The measured local evidence comes from one base Apple M2 machine with 24 GB
-unified memory. Treat the numbers as a reproducible starting point, not a
-promise for other hardware.
+- **Shard residency** — stream Transformer blocks through unified memory instead of keeping the full stack resident
+- **Product CLI** — `shardedit-edit` maps clarity / speed / seed to concrete runtime flags
+- **Conservative default** — `quality` = shard + no residual cache (exact block execution at `guidance=1.0`)
+- **Opt-in cache presets** — `balanced` / `fast` trade fidelity for wall time; keep off until you review faces manually
+- **Reproducible evidence** — benchmark harness, reject/keep rationale, and experiment flags retained for audit
 
-| Path | Output | Time on measured M2 24 GB | Decision |
-| --- | --- | ---: | --- |
-| original mflux `--low-ram` | 576x768 | 1957.33s wall, about 32m37s | baseline |
-| shard, no cache | 576x768 fit-box | 367.94s process, about 6m08s | fidelity default |
-| shard + F1B2/max=1 | 576x768 fit-box | 232.66s process, about 3m53s | opt-in speed |
-| shard + flow-aware | 576x768 fit-box | 258.24s process, about 4m18s | opt-in fidelity-oriented cache |
+## Measured Results
 
-One minute has not been reached. Cache modes pass the current coarse pixel
-screen, but face identity still needs manual review before any cache preset
-should become your default.
+Hardware: base Apple **M2**, **24 GB** unified memory. Portrait reference → `576×768` fit-box. Treat these as a reproducible baseline, not a cross-machine guarantee.
+
+| Path | Time (process) | Role |
+| --- | ---: | --- |
+| stock mflux `--low-ram` | ~32m 37s (wall) | baseline |
+| shard, no cache | ~6m 08s | **default fidelity** |
+| shard + F1B2 / max=1 | ~3m 53s | opt-in speed |
+| shard + flow-aware cache | ~4m 18s | opt-in fidelity-oriented cache |
+
+Sub-minute latency is **not** claimed. Cache presets pass a coarse pixel screen; face identity, hair, and clothing still need human review before you make them default.
+
+## Requirements
+
+| Item | Notes |
+| --- | --- |
+| Hardware | macOS on Apple Silicon with working Metal / MLX |
+| Python | 3.11+ |
+| Runtime deps | `mflux≥0.18`, `mlx≥0.31`, `safetensors≥0.8`, `Pillow≥10` |
+| Local assets | Qwen Image Edit **q6** weights, Lightning LoRA, private `ref.png` |
+
+`mlx-kquant` and full Xcode / Metal CLT are optional — only for reproducing rejected kernel / K-quant probes. See [docs/installation.md](docs/installation.md).
 
 ## Install
 
 ```bash
 python3.11 -m venv .venv
-. .venv/bin/activate
+source .venv/bin/activate
 python -m pip install -U pip
 python -m pip install -e ".[runtime,test]"
 ```
 
-Runtime dependencies are `mflux>=0.18`, `mlx>=0.31`, `safetensors>=0.8`, and
-`Pillow>=10`. `mlx-kquant` is optional and only needed for K-quant diagnostic
-experiments:
+Optional K-quant diagnostics:
 
 ```bash
 python -m pip install -e ".[experiments]"
 ```
 
-Full Xcode / Metal command-line tools are not required for the default Python
-runtime, but they are needed if you reproduce the rejected Swift/metallib path
-or do custom Metal kernel work. See
-[docs/installation.md](docs/installation.md) for the dependency matrix.
-
-Place local assets using these names:
+Expected local layout (all gitignored):
 
 ```text
 models/qwen-edit-2511-q6/
@@ -59,55 +61,38 @@ loras/Qwen-Image-Edit-2511-Lightning-8steps-V1.0-bf16.safetensors
 ref.png
 ```
 
-`ref.png` should be your own private reference image. The default smoke path
-assumes a portrait-like `576x768` reference.
+Override paths via flags or env (`SHARDEDIT_MODEL_PATH`, `SHARDEDIT_LORA_PATH`, `SHARDEDIT_IMAGE_PATH`). Copy [.env.example](.env.example) if useful.
 
 ## Model Assets
 
-The measured local runs used:
+Measured runs used:
 
-- base model weights: [`fcreait/Qwen-Image-Edit-mflux`](https://huggingface.co/fcreait/Qwen-Image-Edit-mflux), specifically the `Qwen-Image-Edit-2511-q6` folder;
-- LoRA: [`lightx2v/Qwen-Image-Edit-2511-Lightning`](https://huggingface.co/lightx2v/Qwen-Image-Edit-2511-Lightning) or the
-  [ModelScope mirror](https://modelscope.cn/models/lightx2v/Qwen-Image-Edit-2511-Lightning), specifically
-  `Qwen-Image-Edit-2511-Lightning-8steps-V1.0-bf16.safetensors`.
+| Asset | Source | File / folder |
+| --- | --- | --- |
+| Base weights (q6) | [`fcreait/Qwen-Image-Edit-mflux`](https://huggingface.co/fcreait/Qwen-Image-Edit-mflux) | `Qwen-Image-Edit-2511-q6` |
+| Lightning LoRA | [`lightx2v/Qwen-Image-Edit-2511-Lightning`](https://huggingface.co/lightx2v/Qwen-Image-Edit-2511-Lightning) ([ModelScope](https://modelscope.cn/models/lightx2v/Qwen-Image-Edit-2511-Lightning)) | `…-8steps-V1.0-bf16.safetensors` |
 
-The q6 weights were chosen as a middle ground. In local face-editing checks,
-q4 was too weak for identity preservation; q8 was larger, skipped for download
-size, and expected to increase memory/runtime pressure on the 24 GB M2 target.
-The exact mflux-ready q6 package used here was downloaded from Hugging Face;
-ModelScope should not be treated as the source for this specific base-weight
-asset. At setup time, other ModelScope resources were visible, including
-2509-related or non-equivalent variants, but not this tested 2511 q6 mflux
-folder.
-
-Example download helpers:
+**Why q6:** local q4 face edits lost identity too easily; q8 was skipped for size and expected 24 GB pressure. The tested mflux-ready q6 package came from Hugging Face — do not assume ModelScope hosts the same folder (visible alternatives there may be 2509 or other non-equivalent variants).
 
 ```bash
 python -m pip install "huggingface_hub[hf_xet]" modelscope
 
-# Download the q6 mflux-ready model folder, then either rename it to
-# models/qwen-edit-2511-q6 or point SHARDEDIT_MODEL_PATH at the downloaded folder.
 huggingface-cli download \
   fcreait/Qwen-Image-Edit-mflux \
   Qwen-Image-Edit-2511-q6 \
   --local-dir models/qwen-edit-mflux
+# then rename/symlink to models/qwen-edit-2511-q6, or set SHARDEDIT_MODEL_PATH
 
-# Choose one LoRA source. ModelScope:
+# LoRA — ModelScope or Hugging Face:
 modelscope download \
   --model lightx2v/Qwen-Image-Edit-2511-Lightning \
   Qwen-Image-Edit-2511-Lightning-8steps-V1.0-bf16.safetensors \
   --local_dir loras
-
-# Or Hugging Face:
-huggingface-cli download \
-  lightx2v/Qwen-Image-Edit-2511-Lightning \
-  Qwen-Image-Edit-2511-Lightning-8steps-V1.0-bf16.safetensors \
-  --local-dir loras
 ```
 
 ## Quick Start
 
-Check command mapping without running inference:
+Dry-run (no inference):
 
 ```bash
 shardedit-edit \
@@ -115,7 +100,7 @@ shardedit-edit \
   --dry-run
 ```
 
-Run the product-facing fidelity path:
+Fidelity path (recommended first run):
 
 ```bash
 shardedit-edit \
@@ -125,65 +110,44 @@ shardedit-edit \
   --output outputs/ref-cafe.png
 ```
 
-Run the benchmark harness dry check:
+Benchmark harness dry check:
 
 ```bash
-benchmarks/run_qwen_edit_benchmark.sh \
-  --runtime shardedit \
-  --dry-run
+benchmarks/run_qwen_edit_benchmark.sh --runtime shardedit --dry-run
 ```
 
-## Normal vs Experimental Controls
+### CLI presets
 
-Use `shardedit-edit` for normal runs:
-
-| User option | Meaning |
+| Option | Meaning |
 | --- | --- |
-| `--image` | Reference image, default `ref.png` |
-| `--prompt` | Edit instruction |
-| `--clarity standard` | Fit output into a `768x768` box; a `576x768` reference stays `576x768` |
-| `--speed quality` | Shard residency, no residual cache |
-| `--speed balanced` | Flow-aware F1B2 cache, opt-in |
-| `--speed fast` | Fixed F1B2 cache, opt-in |
-| `--seed` | Reproducible seed, default `42` |
+| `--clarity standard` | Fit into a `768×768` box; a `576×768` ref stays `576×768` |
+| `--speed quality` | Shard residency, **no** residual cache (default) |
+| `--speed balanced` | Flow-aware F1B2 cache (opt-in) |
+| `--speed fast` | Fixed F1B2 cache (opt-in) |
+| `--seed` | Reproducible seed (default `42`) |
 
-Use `benchmarks/run_qwen_edit_benchmark.sh` and the lower-level
-`--shardedit-*` flags only when reproducing experiments. Rejected probes such
-as token merge V0, dense image MLP, K-quant image MLP, and custom q6 Metal
-kernels remain in the code for auditability, but they are not default speed
-paths.
+Lower-level `--shardedit-*` flags and rejected probes (token merge V0, dense / K-quant image MLP, custom q6 Metal kernels) stay in-tree for reproducibility — they are not recommended defaults. Full map: [docs/parameters.md](docs/parameters.md).
 
-See [docs/parameters.md](docs/parameters.md) for the full parameter map.
+## Design Notes
 
-## Why This Shape
+Defaults stay conservative on purpose:
 
-The current default is conservative:
+1. `guidance=1.0` pruning is mathematically exact.
+2. Shard residency still runs all 8 steps × 60 Transformer blocks.
+3. Fit-box conditioning caps reference token budget.
+4. Residual cache is approximate → opt-in until face review passes.
 
-- `guidance=1.0` pruning is mathematically exact.
-- `shard` residency still executes all 8 steps x 60 Transformer blocks.
-- `fit-box` conditioning caps large references to a controlled token budget.
-- F1B2 and flow-aware cache modes are faster but approximate, so they stay
-  opt-in until manual face review passes.
+Experiment history and reject/keep decisions: [docs/experiment-rationale.md](docs/experiment-rationale.md).
 
-The experiment history and reject/keep decisions are summarized in
-[docs/experiment-rationale.md](docs/experiment-rationale.md). A cleaned Chinese
-article draft lives at [docs/wechat-article.md](docs/wechat-article.md).
+## Documentation
 
-## Open-Source Hygiene
+| Doc | Contents |
+| --- | --- |
+| [docs/installation.md](docs/installation.md) | Dependency matrix, Metal notes, first run |
+| [docs/parameters.md](docs/parameters.md) | Product CLI + experiment flags |
+| [docs/experiment-rationale.md](docs/experiment-rationale.md) | What was tried, kept, and rejected |
+| [docs/open-source-checklist.md](docs/open-source-checklist.md) | Pre-publish hygiene |
 
-Do not commit:
+## License
 
-- `ref.png` or other private reference images.
-- model weights under `models/`.
-- LoRA files under `loras/`.
-- generated outputs under `benchmark-runs/` or `outputs/`.
-
-Before publishing, run:
-
-```bash
-rg -n "lxy-1|/Users/|/private/tmp|benchmark-runs/2026|\\.safetensors" .
-git status --short
-```
-
-The code in this folder is MIT licensed. Model weights, LoRA files, mflux, MLX,
-and Qwen assets each have their own licenses and terms.
+Project code is **MIT**. Model weights, LoRAs, mflux, MLX, and Qwen assets retain their own licenses and terms. Do not commit private images, weights, LoRAs, or generated outputs.

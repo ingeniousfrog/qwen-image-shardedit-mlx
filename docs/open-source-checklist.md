@@ -9,6 +9,7 @@ Run this before copying the folder to a public repository.
 - `ref.png` is ignored and should be a private local file only.
 - `models/` and `loras/` are ignored.
 - `benchmark-runs/`, `outputs/`, and `swift-overlays/` are ignored.
+- `docs/wechat-article.md` and `docs/illustrations/` are local-only publishing drafts; do not commit.
 - No generated output images are included.
 - No local absolute paths are used as defaults.
 

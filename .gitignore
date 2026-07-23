@@ -1,0 +1,28 @@
+.DS_Store
+.venv/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Local model assets and private test data.
+models/
+loras/
+ref.png
+ref-*.png
+*.safetensors
+
+# Generated outputs.
+benchmark-runs/
+outputs/
+shardedit-edit.png
+swift-overlays/
+external/
+
+# Local environment overrides.
+.env
+.env.local
+
+# Private publishing drafts and illustration assets (local only).
+docs/wechat-article.md
+docs/illustrations/
