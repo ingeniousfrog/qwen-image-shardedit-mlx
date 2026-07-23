@@ -1,0 +1,117 @@
+{
+  "last_updated": "2026-07-23",
+  "purpose": "Starter qwen-image-shardedit-mlx quality regression manifest. It uses local placeholder image names only; no reference photos or generated outputs are bundled.",
+  "coverage_note": "Put your own test image at ./ref.png for the default smoke path. Before promoting an opt-in cache preset to a local default, extend this manifest with multiple private references and manual face checks.",
+  "defaults": {
+    "width": 576,
+    "height": 768,
+    "steps": 8,
+    "guidance": 1.0,
+    "seed": 42,
+    "model": "models/qwen-edit-2511-q6",
+    "lora": "loras/Qwen-Image-Edit-2511-Lightning-8steps-V1.0-bf16.safetensors",
+    "baseline_runtime": "shardedit --residency shard --reference-conditioning-size fit-box --reference-conditioning-max-width 576 --reference-conditioning-max-height 768 --cache-threshold 0",
+    "candidate_runtime": "shardedit --residency shard --reference-conditioning-size fit-box --reference-conditioning-max-width 576 --reference-conditioning-max-height 768 --cache-threshold 0.8 --cache-max-consecutive 1 --cache-back-blocks 2"
+  },
+  "pixel_thresholds": {
+    "max_mae": 14.0,
+    "min_psnr_db": 20.0,
+    "max_changed_channel_ratio": 0.98
+  },
+  "coverage_requirements": {
+    "min_total_cases": 3,
+    "min_comparable_cases": 3,
+    "min_distinct_reference_images": 1,
+    "required_case_tags": [
+      "portrait",
+      "identity",
+      "background_change",
+      "lighting_change",
+      "texture_retention"
+    ]
+  },
+  "candidate_matrix": {
+    "status": "template",
+    "fixed_output_size": {
+      "width": 576,
+      "height": 768
+    },
+    "baseline": "576x768 + shard + fit-box conditioning + no cache",
+    "quality_candidate": "576x768 + shard + fit-box conditioning + F1B2/max=1",
+    "speed_candidate": "576x768 + short-side-512 conditioning + F1B2/max=1",
+    "flow_aware_candidate": "576x768 + fit-box conditioning + F1B2/max=1 + flow-aware threshold",
+    "conditioning_note": "For large references, use fit-box with max-width 576 and max-height 768 instead of uncapped original-size conditioning."
+  },
+  "pixel_metric_reference": {
+    "tool": "tools/run_quality_regression.py",
+    "threshold_note": "These thresholds are a coarse automated screen only. Passing them does not make a cache mode quality-equivalent; manual review still gates promotion."
+  },
+  "cases": [
+    {
+      "id": "portrait_cafe_identity",
+      "reference_images": [
+        "ref.png"
+      ],
+      "tags": [
+        "portrait",
+        "identity",
+        "background_change",
+        "texture_retention"
+      ],
+      "prompt": "Replace the background with a naturally lit cafe interior while preserving identity, hair, expression, pose, and clothing details.",
+      "manual_checks": [
+        "face identity",
+        "hair edge detail",
+        "clothing texture",
+        "background instruction adherence",
+        "no new facial artifacts"
+      ],
+      "baseline_output": "benchmark-runs/quality/portrait_cafe_identity/baseline.png",
+      "candidate_output": "benchmark-runs/quality/portrait_cafe_identity/candidate.png"
+    },
+    {
+      "id": "portrait_window_light_identity",
+      "reference_images": [
+        "ref.png"
+      ],
+      "tags": [
+        "portrait",
+        "identity",
+        "lighting_change",
+        "texture_retention"
+      ],
+      "prompt": "Change the scene to soft natural window light while preserving the subject identity, skin tone, hair shape, and clothing details.",
+      "manual_checks": [
+        "face identity",
+        "skin tone stability",
+        "hair edge detail",
+        "lighting looks natural"
+      ],
+      "baseline_output": "benchmark-runs/quality/portrait_window_light_identity/baseline.png",
+      "candidate_output": "benchmark-runs/quality/portrait_window_light_identity/candidate.png"
+    },
+    {
+      "id": "portrait_studio_texture_identity",
+      "reference_images": [
+        "ref.png"
+      ],
+      "tags": [
+        "portrait",
+        "identity",
+        "background_change",
+        "pose_stability",
+        "texture_retention"
+      ],
+      "prompt": "Replace the background with a clean studio backdrop while preserving the face, pose, hair, clothing texture, and expression.",
+      "manual_checks": [
+        "face identity",
+        "pose stability",
+        "hair shape",
+        "fine texture retention",
+        "clean studio background"
+      ],
+      "baseline_output": "benchmark-runs/quality/portrait_studio_texture_identity/baseline.png",
+      "candidate_output": "benchmark-runs/quality/portrait_studio_texture_identity/candidate.png"
+    }
+  ]
+}

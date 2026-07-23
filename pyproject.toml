@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qwen-image-shardedit-mlx"
+version = "0.1.0"
+description = "Apple Silicon MLX runtime experiments for Qwen Image Edit with shard residency and opt-in cache probes"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {file = "LICENSE"}
+authors = [
+  {name = "qwen-image-shardedit-mlx contributors"}
+]
+keywords = ["mlx", "qwen", "image-edit", "apple-silicon", "mflux"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Topic :: Multimedia :: Graphics",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence"
+]
+
+[project.optional-dependencies]
+runtime = ["mflux>=0.18", "mlx>=0.31", "safetensors>=0.8", "Pillow>=10"]
+test = ["pytest>=9"]
+experiments = ["mlx-kquant>=0.3.5"]
+
+[project.scripts]
+shardedit-edit = "shardedit_mlx.product_cli:main"
+shardedit-mflux-edit = "shardedit_mlx.mflux_fast_edit:main"
+shardedit-warm-edit = "shardedit_mlx.warm_worker:main"
+shardedit-quality-regression = "shardedit_mlx.quality_regression:main"
+
+[tool.setuptools.packages.find]
+include = ["shardedit_mlx*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
