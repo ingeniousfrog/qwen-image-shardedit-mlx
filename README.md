@@ -123,6 +123,18 @@ Rename or symlink the q6 folder to `models/qwen-edit-2511-q6`, or point
 
 ## CLI
 
+`shardedit-edit` is not a stock mflux command. It is the console script
+registered by this package in `pyproject.toml`:
+
+```toml
+[project.scripts]
+shardedit-edit = "shardedit_mlx.product_cli:main"
+```
+
+It is the product-facing entry point: it accepts `image` / `prompt` / `speed` /
+`seed`, then expands them into lower-level `shardedit_mlx.mflux_fast_edit` and
+mflux runtime arguments.
+
 Check command mapping without running inference:
 
 ```bash

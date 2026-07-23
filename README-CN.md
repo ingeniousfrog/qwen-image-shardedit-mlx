@@ -116,6 +116,17 @@ huggingface-cli download \
 
 ## CLI 用法
 
+这里的 `shardedit-edit` 不是 mflux 原生命令，而是本项目安装时注册的 console
+script。来源在 `pyproject.toml`：
+
+```toml
+[project.scripts]
+shardedit-edit = "shardedit_mlx.product_cli:main"
+```
+
+它是普通用户入口：接收 `image` / `prompt` / `speed` / `seed` 等参数，再展开成
+底层 `shardedit_mlx.mflux_fast_edit` 和 mflux 运行参数。
+
 先 dry-run，确认命令如何展开：
 
 ```bash
